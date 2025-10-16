@@ -17,6 +17,8 @@ import { isAuthenticationWwwAuthenticateRequest } from './utils/isAuthentication
 
 const EventDebounce = 5 * 1000; // 5 seconds
 
+let armSubs: typeof import('@azure/arm-resources-subscriptions') | undefined;
+
 /**
  * A class for obtaining Azure subscription information using VSCode's built-in authentication
  * provider.
@@ -141,8 +143,9 @@ export class VSCodeAzureSubscriptionProvider extends vscode.Disposable implement
 
         // It's possible that by listing subscriptions in all tenants and the "home" tenant there could be duplicate subscriptions
         // Thus, we remove duplicate subscriptions. However, if multiple accounts have the same subscription, we keep them.
+        // There are also cases where the same subscription could appear in different tenants under the same account so we also need to keep those
         const subscriptionMap = new Map<string, AzureSubscription>();
-        allSubscriptions.forEach(sub => subscriptionMap.set(`${sub.account.id}/${sub.subscriptionId}`, sub));
+        allSubscriptions.forEach(sub => subscriptionMap.set(`${sub.account.id}/${sub.tenantId}/${sub.subscriptionId}`, sub));
         const uniqueSubscriptions = Array.from(subscriptionMap.values());
 
         const endTime = Date.now();
@@ -316,7 +319,7 @@ export class VSCodeAzureSubscriptionProvider extends vscode.Disposable implement
      * @returns A client, the credential used by the client, and the authentication function
      */
     private async getSubscriptionClient(account: vscode.AuthenticationSessionAccountInformation, tenantId?: string, scopes?: string[]): Promise<{ client: SubscriptionClient, credential: TokenCredential, authentication: AzureAuthentication }> {
-        const armSubs = await import('@azure/arm-resources-subscriptions');
+        armSubs ||= await import('@azure/arm-resources-subscriptions');
 
         const session = await getSessionFromVSCode(scopes, tenantId, { createIfNone: false, silent: true, account });
 
